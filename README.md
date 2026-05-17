@@ -66,11 +66,11 @@ The frontend will be available at `http://localhost:5173`.
 
 AgentRQ is designed for seamless integration as a **Claude Channel**. This allows your AI agents to see tasks assigned to them and respond directly within your Claude session.
 
-Each workspace has its own MCP URL and token (visible in the workspace setup modal). In production, these follow the pattern `https://WORKSPACE_ID.mcp.agentrq.com/mcp`.
+Each workspace has its own MCP URL and token (visible in the workspace setup modal). In production, these follow the pattern `https://WORKSPACE_ID.mcp.agentrq.com/`.
 
 ### Step 1 — `.mcp.json`
 
-Create a `.mcp.json` file in your local project directory (the leading dot is required). Each project gets its own file so Claude instances stay isolated per workspace. Replace `YOUR_MCP_URL` below with the full URL shown in the setup modal (e.g. `https://WORKSPACE_ID.mcp.agentrq.com/mcp?token=TOKEN`).
+Create a `.mcp.json` file in your local project directory (the leading dot is required). Each project gets its own file so Claude instances stay isolated per workspace. Replace `YOUR_MCP_URL` below with the full URL shown in the setup modal (e.g. `https://WORKSPACE_ID.mcp.agentrq.com/?token=TOKEN`).
 
 ```json
 {
@@ -172,16 +172,28 @@ mkdir -p .codex
 cat >> .codex/config.toml << 'EOF'
 
 [mcp_servers.agentrq-workspace]
-url = "https://<WORKSPACEID>.mcp.agentrq.com/mcp?token=<TOKEN>"
-allow = [
-  "mcp__agentrq-workspace__updateTaskStatus",
-  "mcp__agentrq-workspace__getWorkspace",
-  "mcp__agentrq-workspace__reply",
-  "mcp__agentrq-workspace__createTask",
-  "mcp__agentrq-workspace__downloadAttachment",
-  "mcp__agentrq-workspace__getTaskMessages",
-  "mcp__agentrq-workspace__getNextTask"
-]
+url = "https://<WORKSPACEID>.mcp.agentrq.com/?token=<TOKEN>"
+
+[mcp_servers.agentrq-<ID>.tools.updateTaskStatus]
+approval_mode = "approve"
+
+[mcp_servers.agentrq-<ID>.tools.getWorkspace]
+approval_mode = "approve"
+
+[mcp_servers.agentrq-<ID>.tools.reply]
+approval_mode = "approve"
+
+[mcp_servers.agentrq-<ID>.tools.createTask]
+approval_mode = "approve"
+
+[mcp_servers.agentrq-<ID>.tools.downloadAttachment]
+approval_mode = "approve"
+
+[mcp_servers.agentrq-<ID>.tools.getTaskMessages]
+approval_mode = "approve"
+
+[mcp_servers.agentrq-<ID>.tools.getNextTask]
+approval_mode = "approve"
 EOF
 ```
 

@@ -405,15 +405,27 @@ const permissionsConfigJson = computed(() => JSON.stringify(permissionsConfig.va
 const codexConfigToml = computed(() => {
   return `[mcp_servers.${serverName.value}]
 url = "${authenticatedUrl.value}"
-allow = [
-  "mcp__${serverName.value}__updateTaskStatus",
-  "mcp__${serverName.value}__getWorkspace",
-  "mcp__${serverName.value}__reply",
-  "mcp__${serverName.value}__createTask",
-  "mcp__${serverName.value}__downloadAttachment",
-  "mcp__${serverName.value}__getTaskMessages",
-  "mcp__${serverName.value}__getNextTask"
-]`;
+
+[mcp_servers.${serverName.value}.tools.updateTaskStatus]
+approval_mode = "approve"
+
+[mcp_servers.${serverName.value}.tools.getWorkspace]
+approval_mode = "approve"
+
+[mcp_servers.${serverName.value}.tools.reply]
+approval_mode = "approve"
+
+[mcp_servers.${serverName.value}.tools.createTask]
+approval_mode = "approve"
+
+[mcp_servers.${serverName.value}.tools.downloadAttachment]
+approval_mode = "approve"
+
+[mcp_servers.${serverName.value}.tools.getTaskMessages]
+approval_mode = "approve"
+
+[mcp_servers.${serverName.value}.tools.getNextTask]
+approval_mode = "approve"`;
 });
 
 function copyToClipboard(text, key) {
