@@ -135,7 +135,21 @@ func (c *controller) recordCRUD(event entity.CRUDEvent) {
 	case entity.ActionTaskApproveManual:
 		action = model.ActionIDTaskApproveManual
 	case entity.ActionTaskFromScheduled:
-		action = model.ActionIDTaskFromScheduled
+		c.queue <- model.Telemetry{
+			UserID:      event.UserID,
+			WorkspaceID: event.WorkspaceID,
+			OccurredAt:  time.Now().Unix(),
+			Action:      model.ActionIDTaskFromScheduled,
+			Actor:       uint8(event.Actor),
+		}
+		c.queue <- model.Telemetry{
+			UserID:      event.UserID,
+			WorkspaceID: event.WorkspaceID,
+			OccurredAt:  time.Now().Unix(),
+			Action:      model.ActionIDTaskCreate,
+			Actor:       uint8(event.Actor),
+		}
+		return
 	case entity.ActionTaskRejectManual:
 		action = model.ActionIDTaskRejectManual
 	case entity.ActionUserCreate:

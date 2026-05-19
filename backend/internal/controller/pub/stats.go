@@ -224,7 +224,9 @@ func (c *statsController) handleCRUD(event entity.CRUDEvent) {
 	case entity.ActionTaskApproveManual:
 		action = model.ActionIDTaskApproveManual
 	case entity.ActionTaskFromScheduled:
-		action = model.ActionIDTaskFromScheduled
+		c.recordAction(model.ActionIDTaskFromScheduled)
+		c.recordAction(model.ActionIDTaskCreate)
+		return
 	case entity.ActionTaskRejectManual:
 		action = model.ActionIDTaskRejectManual
 	case entity.ActionUserCreate:
