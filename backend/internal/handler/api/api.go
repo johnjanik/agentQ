@@ -245,14 +245,22 @@ func (h *handler) rootLogin() fiber.Handler {
 			Name:  "Root Administrator",
 		})
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to sync root user"})
+			zlog.Error().Err(err).Msg("Failed to sync root user")
+			c.Set(_headerContentType, _mimeJSON)
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
 		}
 
 		userID := monoflake.ID(dbUser.User.ID).String()
 
 		tokenString, err := h.tokenSvc.CreateToken(userID, "root@agentrq.local", "Root Administrator", "")
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to sign token"})
+			zlog.Error().Err(err).Msg("Failed to sign root token")
+			c.Set(_headerContentType, _mimeJSON)
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
 		}
 
 		cookie := &fiber.Cookie{
@@ -288,7 +296,11 @@ func (h *handler) googleCallback() fiber.Handler {
 
 		user, err := h.auth.Exchange(ctx, code)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			zlog.Error().Err(err).Msg("OAuth exchange failed")
+			c.Set(_headerContentType, _mimeJSON)
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
 		}
 
 		zlog.Info().Str("id", user.ID).Str("email", user.Email).Str("name", user.Name).Msg("OAuth code exchanged")
@@ -305,7 +317,11 @@ func (h *handler) googleCallback() fiber.Handler {
 			Picture: user.Picture,
 		})
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to sync user"})
+			zlog.Error().Err(err).Msg("Failed to sync user")
+			c.Set(_headerContentType, _mimeJSON)
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
 		}
 
 		// Use base62 ID for JWT "sub" and app-wide user identifier
@@ -314,7 +330,11 @@ func (h *handler) googleCallback() fiber.Handler {
 		// Create JWT using centralized logic
 		tokenString, err := h.tokenSvc.CreateToken(userID, user.Email, user.Name, user.Picture)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to sign token"})
+			zlog.Error().Err(err).Msg("Failed to sign token")
+			c.Set(_headerContentType, _mimeJSON)
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
 		}
 
 		cookie := &fiber.Cookie{
@@ -382,6 +402,8 @@ func (h *handler) createWorkspace() fiber.Handler {
 		defer cancel()
 		rs, err := h.crud.CreateWorkspace(ctx, *rq)
 		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to create workspace")
+			c.Set(_headerContentType, _mimeJSON)
 			e, status := mapper.FromErrorToHTTPResponse(err)
 			c.Status(status)
 			return c.Send(e)
@@ -413,6 +435,8 @@ func (h *handler) getWorkspace() fiber.Handler {
 		defer cancel()
 		rs, err := h.crud.GetWorkspace(ctx, *rq)
 		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to get workspace")
+			c.Set(_headerContentType, _mimeJSON)
 			e, status := mapper.FromErrorToHTTPResponse(err)
 			c.Status(status)
 			return c.Send(e)
@@ -442,6 +466,8 @@ func (h *handler) listWorkspaces() fiber.Handler {
 			IncludeArchived: archived,
 		})
 		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to list workspaces")
+			c.Set(_headerContentType, _mimeJSON)
 			e, status := mapper.FromErrorToHTTPResponse(err)
 			c.Status(status)
 			return c.Send(e)
@@ -476,6 +502,8 @@ func (h *handler) deleteWorkspace() fiber.Handler {
 		ctx, cancel := newContext(c)
 		defer cancel()
 		if err := h.crud.DeleteWorkspace(ctx, *rq); err != nil {
+			zlog.Error().Err(err).Msg("Failed to delete workspace")
+			c.Set(_headerContentType, _mimeJSON)
 			e, status := mapper.FromErrorToHTTPResponse(err)
 			c.Status(status)
 			return c.Send(e)
@@ -497,6 +525,8 @@ func (h *handler) archiveWorkspace() fiber.Handler {
 		ctx, cancel := newContext(c)
 		defer cancel()
 		if err := h.crud.ArchiveWorkspace(ctx, rq); err != nil {
+			zlog.Error().Err(err).Msg("Failed to archive workspace")
+			c.Set(_headerContentType, _mimeJSON)
 			e, status := mapper.FromErrorToHTTPResponse(err)
 			c.Status(status)
 			return c.Send(e)
@@ -518,6 +548,8 @@ func (h *handler) unarchiveWorkspace() fiber.Handler {
 		ctx, cancel := newContext(c)
 		defer cancel()
 		if err := h.crud.UnarchiveWorkspace(ctx, rq); err != nil {
+			zlog.Error().Err(err).Msg("Failed to unarchive workspace")
+			c.Set(_headerContentType, _mimeJSON)
 			e, status := mapper.FromErrorToHTTPResponse(err)
 			c.Status(status)
 			return c.Send(e)
@@ -544,6 +576,8 @@ func (h *handler) updateWorkspace() fiber.Handler {
 		defer cancel()
 		rs, err := h.crud.UpdateWorkspace(ctx, *rq)
 		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to update workspace")
+			c.Set(_headerContentType, _mimeJSON)
 			e, status := mapper.FromErrorToHTTPResponse(err)
 			c.Status(status)
 			return c.Send(e)
@@ -587,6 +621,8 @@ func (h *handler) getWorkspaceToken() fiber.Handler {
 			UserID: userID,
 		})
 		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to verify workspace access for token")
+			c.Set(_headerContentType, _mimeJSON)
 			e, status := mapper.FromErrorToHTTPResponse(err)
 			c.Status(status)
 			return c.Send(e)
@@ -594,7 +630,11 @@ func (h *handler) getWorkspaceToken() fiber.Handler {
 
 		token, err := h.tokenSvc.CreateMCPToken(userID, workspaceID, "access")
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate workspace token"})
+			zlog.Error().Err(err).Msg("Failed to generate workspace token")
+			c.Set(_headerContentType, _mimeJSON)
+			e, status := mapper.FromErrorToHTTPResponse(err)
+			c.Status(status)
+			return c.Send(e)
 		}
 		return c.JSON(fiber.Map{"token": token})
 	}
@@ -626,6 +666,8 @@ func (h *handler) getWorkspaceStats() fiber.Handler {
 		defer cancel()
 		rs, err := h.crud.GetDetailedWorkspaceStats(ctx, rq)
 		if err != nil {
+			zlog.Error().Err(err).Msg("Failed to get workspace stats")
+			c.Set(_headerContentType, _mimeJSON)
 			e, status := mapper.FromErrorToHTTPResponse(err)
 			c.Status(status)
 			return c.Send(e)
