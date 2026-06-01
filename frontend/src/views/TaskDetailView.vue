@@ -149,17 +149,17 @@
                    <!-- Pending verdict buttons -->
                    <div v-if="m.metadata.status === 'pending'" class="flex flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-zinc-800">
                       <button @click="handleVerdict(m.metadata.request_id, 'allow')"
-                              :disabled="!!workspace.archived_at"
+                              :disabled="!!workspace.archivedAt"
                               class="px-3 py-1.5 rounded-sm bg-gray-900 hover:bg-black dark:bg-white dark:hover:bg-gray-100 text-white dark:text-black text-[10px] font-semibold transition-all disabled:opacity-50 shadow-sm">
                         Allow Once
                       </button>
                       <button @click="handleVerdict(m.metadata.request_id, 'allow_always')"
-                              :disabled="!!workspace.archived_at"
+                              :disabled="!!workspace.archivedAt"
                               class="px-3 py-1.5 rounded-sm bg-white dark:bg-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-100 border border-gray-200 dark:border-zinc-700 text-[10px] font-semibold transition-all disabled:opacity-50 shadow-sm">
                         Always Allow
                       </button>
                       <button @click="handleVerdict(m.metadata.request_id, 'deny')"
-                              :disabled="!!workspace.archived_at"
+                              :disabled="!!workspace.archivedAt"
                               class="px-3 py-1.5 rounded-sm bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-700 dark:text-red-500 text-[10px] font-semibold transition-all disabled:opacity-50 border border-red-100 dark:border-red-500/20">
                         Deny
                       </button>

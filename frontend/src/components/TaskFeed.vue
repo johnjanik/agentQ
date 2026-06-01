@@ -429,12 +429,19 @@ function startCreate() {
 }
 
 function openTask(task) {
+  const query = router.currentRoute.value.query;
   if (task.status === 'cron') {
-    router.push(`/workspaces/${props.workspaceId}/tasks/${task.id}/instances`);
+    router.push({
+      path: `/workspaces/${props.workspaceId}/tasks/${task.id}/instances`,
+      query
+    });
     return;
   }
   // This router push will now load inside the WorkspaceDetailView's router-view
-  router.push(`/workspaces/${props.workspaceId}/tasks/${task.id}`);
+  router.push({
+    path: `/workspaces/${props.workspaceId}/tasks/${task.id}`,
+    query
+  });
 }
 
 function triggerEdit(task) {

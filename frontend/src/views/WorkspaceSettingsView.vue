@@ -419,11 +419,11 @@
                   <div class="space-y-4">
                     <div class="p-6 border border-red-100 dark:border-red-900/30 bg-red-50/30 dark:bg-red-500/5 rounded-sm flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
                       <div class="flex-1">
-                        <h4 class="text-sm font-bold text-gray-900 dark:text-zinc-100">{{ workspace?.archived_at ? 'Restore Workspace' : 'Archive Workspace' }}</h4>
-                        <p class="text-[11px] text-gray-600 dark:text-zinc-400 mt-1 font-medium">{{ workspace?.archived_at ? 'Bring this workspace back to active status.' : 'Make this workspace read-only. Connections will be paused.' }}</p>
+                        <h4 class="text-sm font-bold text-gray-900 dark:text-zinc-100">{{ workspace?.archivedAt ? 'Restore Workspace' : 'Archive Workspace' }}</h4>
+                        <p class="text-[11px] text-gray-600 dark:text-zinc-400 mt-1 font-medium">{{ workspace?.archivedAt ? 'Bring this workspace back to active status.' : 'Make this workspace read-only. Connections will be paused.' }}</p>
                       </div>
                       <button type="button" @click="handleArchiveToggle" class="px-6 py-2.5 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-[10px] font-bold text-gray-900 dark:text-zinc-100 hover:border-black dark:hover:border-white transition-all shadow-sm rounded-sm uppercase tracking-widest whitespace-nowrap">
-                        {{ workspace?.archived_at ? 'Unarchive' : 'Archive Workspace' }}
+                        {{ workspace?.archivedAt ? 'Unarchive' : 'Archive Workspace' }}
                       </button>
                     </div>
 
@@ -745,7 +745,7 @@ async function handleIconUpload(e) {
 }
 
 function handleArchiveToggle() {
-  if (workspace.value?.archived_at) {
+  if (workspace.value?.archivedAt) {
     doUnarchive();
   } else {
     showArchiveConfirm.value = true;
