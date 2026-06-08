@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"github.com/agentrq/agentrq/backend/internal/repository/base"
 	"github.com/agentrq/agentrq/backend/internal/service/auth"
 	"github.com/gofiber/fiber/v2"
+	"github.com/mustafaturan/monoflake"
 )
 
 type mockAuthService struct {
@@ -218,4 +220,58 @@ func TestGetWorkspaceTaskCounts(t *testing.T) {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
 		}
 	})
+}
+
+type mockCrudWorkspaceAccess struct {
+	crud.Controller
+	checkWorkspaceAccessFunc func(ctx context.Context, id int64, userID string) (bool, error)
+}
+
+func (m *mockCrudWorkspaceAccess) CheckWorkspaceAccess(ctx context.Context, id int64, userID string) (bool, error) {
+	return m.checkWorkspaceAccessFunc(ctx, id, userID)
+}
+
+func TestSendPermissionVerdict_RequiresWorkspaceAccess(t *testing.T) {
+	app := fiber.New()
+	crudCtrl := &mockCrudWorkspaceAccess{}
+
+	h := &handler{
+		crud: crudCtrl,
+		// Intentionally leave MCPManager nil: unauthorized requests must fail
+		// before any permission verdict can be dispatched to a workspace server.
+	}
+
+	workspaceID := monoflake.ID(1).String()
+	taskID := monoflake.ID(2).String()
+	userID := monoflake.ID(100).String()
+
+	app.Post("/api/v1/workspaces/:id/tasks/:taskID/permission", func(c *fiber.Ctx) error {
+		c.Locals("user_id", userID)
+		return h.sendPermissionVerdict()(c)
+	})
+
+	crudCtrl.checkWorkspaceAccessFunc = func(ctx context.Context, id int64, gotUserID string) (bool, error) {
+		if id != 1 {
+			t.Fatalf("expected workspace ID 1, got %d", id)
+		}
+		if gotUserID != userID {
+			t.Fatalf("expected user ID %s, got %s", userID, gotUserID)
+		}
+		return false, nil
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/workspaces/"+workspaceID+"/tasks/"+taskID+"/permission",
+		bytes.NewBufferString(`{"requestId":"req-1","behavior":"allow"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d", resp.StatusCode)
+	}
 }

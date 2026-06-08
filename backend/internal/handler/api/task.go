@@ -514,6 +514,12 @@ func (h *handler) sendPermissionVerdict() fiber.Handler {
 		workspaceID := monoflake.IDFromBase62(c.Params("id")).Int64()
 		userID := c.Locals("user_id").(string)
 
+		ctx, cancel := newContext(c)
+		defer cancel()
+		if ok, err := h.crud.CheckWorkspaceAccess(ctx, workspaceID, userID); err != nil || !ok {
+			return c.Status(http.StatusForbidden).JSON(fiber.Map{"error": "forbidden"})
+		}
+
 		srv := h.mcpManager.Get(workspaceID, userID)
 		if srv == nil {
 			return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "mcp server not found"})
