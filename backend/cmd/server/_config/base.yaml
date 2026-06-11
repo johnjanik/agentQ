@@ -53,7 +53,7 @@ slack:
 webPush:
   vapidPublicKey: ${AGENTRQ_WEBPUSH_VAPID_PUBLIC_KEY:}
   vapidPrivateKey: ${AGENTRQ_WEBPUSH_VAPID_PRIVATE_KEY:}
-  subscriber: ${AGENTRQ_WEBPUSH_SUBSCRIBER:mailto:admin@agentrq.com}
+  subscriber: ${AGENTRQ_WEBPUSH_SUBSCRIBER:mailto:hi@example.com}
 
 ddos:
   enabled: ${AGENTRQ_DDOS_ENABLED:true}

@@ -205,7 +205,7 @@ func (c *controller) sendToUser(ctx context.Context, userID int64, payload pushP
 
 	subscriber := c.cfg.Subscriber
 	if subscriber == "" {
-		subscriber = "mailto:admin@agentrq.com"
+		subscriber = "mailto:hi@example.com"
 	}
 
 	for _, sub := range subs {
