@@ -65,7 +65,7 @@ type Repository interface {
 	// Push subscriptions
 	SavePushSubscription(ctx context.Context, sub model.PushSubscription) error
 	DeletePushSubscription(ctx context.Context, userID int64, endpoint string) error
-	ListPushSubscriptionsByUser(ctx context.Context, userID int64) ([]model.PushSubscription, error)
+	ListPushSubscriptionsByUserAndWorkspace(ctx context.Context, userID int64, workspaceID int64) ([]model.PushSubscription, error)
 }
 
 type repository struct {
@@ -746,8 +746,8 @@ func (r *repository) DeletePushSubscription(ctx context.Context, userID int64, e
 		Delete(&model.PushSubscription{}).Error
 }
 
-func (r *repository) ListPushSubscriptionsByUser(ctx context.Context, userID int64) ([]model.PushSubscription, error) {
+func (r *repository) ListPushSubscriptionsByUserAndWorkspace(ctx context.Context, userID int64, workspaceID int64) ([]model.PushSubscription, error) {
 	var subs []model.PushSubscription
-	err := r.conn(ctx).Where("user_id = ?", userID).Find(&subs).Error
+	err := r.conn(ctx).Where("user_id = ? AND workspace_id = ?", userID, workspaceID).Find(&subs).Error
 	return subs, err
 }

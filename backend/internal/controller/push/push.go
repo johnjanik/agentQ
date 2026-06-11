@@ -189,11 +189,11 @@ func (c *controller) processEvent(ctx context.Context, ev entity.CRUDEvent) {
 		return
 	}
 
-	c.sendToUser(ctx, ownerID, payload)
+	c.sendToUser(ctx, ownerID, ev.WorkspaceID, payload)
 }
 
-func (c *controller) sendToUser(ctx context.Context, userID int64, payload pushPayload) {
-	subs, err := c.repo.ListPushSubscriptionsByUser(ctx, userID)
+func (c *controller) sendToUser(ctx context.Context, userID int64, workspaceID int64, payload pushPayload) {
+	subs, err := c.repo.ListPushSubscriptionsByUserAndWorkspace(ctx, userID, workspaceID)
 	if err != nil || len(subs) == 0 {
 		return
 	}
