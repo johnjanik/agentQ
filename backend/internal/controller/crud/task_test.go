@@ -657,10 +657,11 @@ func TestGetAttachment_Success(t *testing.T) {
 
 	e.repo.EXPECT().CheckWorkspaceAccess(gomock.Any(), int64(1), testUserID).Return(true, nil)
 	e.storage.EXPECT().LoadRaw("att-1").Return([]byte("content"), nil)
-	e.repo.EXPECT().FindAttachmentMetadata(gomock.Any(), int64(1), "att-1").Return("f.txt", "text/plain", nil)
+	e.repo.EXPECT().FindAttachmentMetadata(gomock.Any(), int64(1), int64(10), "att-1").Return("f.txt", "text/plain", nil)
 
 	resp, err := e.controller.GetAttachment(context.Background(), entity.GetAttachmentRequest{
 		WorkspaceID:  1,
+		TaskID:       10,
 		AttachmentID: "att-1",
 		UserID:       testUserIDStr,
 	})
@@ -668,7 +669,121 @@ func TestGetAttachment_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if string(resp.Data) != "content" {
-		t.Errorf("expected content")
+		t.Errorf("expected content, got %q", string(resp.Data))
+	}
+	if resp.Filename != "f.txt" || resp.MimeType != "text/plain" {
+		t.Errorf("unexpected metadata: %s %s", resp.Filename, resp.MimeType)
+	}
+}
+
+func TestGetAttachment_AccessDenied(t *testing.T) {
+	e := newTestController(t)
+
+	e.repo.EXPECT().CheckWorkspaceAccess(gomock.Any(), int64(1), testUserID).Return(false, nil)
+
+	_, err := e.controller.GetAttachment(context.Background(), entity.GetAttachmentRequest{
+		WorkspaceID:  1,
+		TaskID:       10,
+		AttachmentID: "att-1",
+		UserID:       testUserIDStr,
+	})
+	if err == nil {
+		t.Fatal("expected error for access denied")
+	}
+}
+
+func TestGetAttachment_FileNotFound(t *testing.T) {
+	e := newTestController(t)
+
+	e.repo.EXPECT().CheckWorkspaceAccess(gomock.Any(), int64(1), testUserID).Return(true, nil)
+	e.storage.EXPECT().LoadRaw("att-missing").Return(nil, fmt.Errorf("no such file"))
+
+	_, err := e.controller.GetAttachment(context.Background(), entity.GetAttachmentRequest{
+		WorkspaceID:  1,
+		TaskID:       10,
+		AttachmentID: "att-missing",
+		UserID:       testUserIDStr,
+	})
+	if err == nil {
+		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestGetAttachment_MetadataNotFound(t *testing.T) {
+	e := newTestController(t)
+
+	e.repo.EXPECT().CheckWorkspaceAccess(gomock.Any(), int64(1), testUserID).Return(true, nil)
+	e.storage.EXPECT().LoadRaw("att-1").Return([]byte("data"), nil)
+	e.repo.EXPECT().FindAttachmentMetadata(gomock.Any(), int64(1), int64(10), "att-1").Return("", "", fmt.Errorf("attachment metadata not found"))
+
+	_, err := e.controller.GetAttachment(context.Background(), entity.GetAttachmentRequest{
+		WorkspaceID:  1,
+		TaskID:       10,
+		AttachmentID: "att-1",
+		UserID:       testUserIDStr,
+	})
+	if err == nil {
+		t.Fatal("expected error for missing metadata")
+	}
+}
+
+func TestRespondToTask_AttachmentOnly(t *testing.T) {
+	e := newTestController(t)
+
+	task := model.Task{ID: 10, WorkspaceID: 1, Status: "ongoing"}
+	updated := model.Task{ID: 10, WorkspaceID: 1, Status: "ongoing"}
+
+	e.repo.EXPECT().GetWorkspace(gomock.Any(), int64(1), testUserID).Return(activeWorkspace(), nil)
+	e.repo.EXPECT().GetTask(gomock.Any(), int64(1), int64(10), testUserID).Return(task, nil)
+	e.idgen.EXPECT().NextID().Return(int64(200)) // attachment ID
+	e.idgen.EXPECT().NextID().Return(int64(201)) // message ID
+	e.storage.EXPECT().Save(gomock.Any(), "base64data").Return(nil)
+	e.repo.EXPECT().CreateMessage(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, m model.Message) error {
+			if len(m.Attachments) == 0 {
+				return fmt.Errorf("expected attachments to be stored in message")
+			}
+			return nil
+		},
+	)
+	e.repo.EXPECT().UpdateTask(gomock.Any(), gomock.Any()).Return(updated, nil)
+	e.repo.EXPECT().GetTask(gomock.Any(), int64(1), int64(10), testUserID).Return(updated, nil)
+
+	_, err := e.controller.RespondToTask(context.Background(), entity.RespondToTaskRequest{
+		WorkspaceID: 1,
+		TaskID:      10,
+		Action:      "text",
+		Text:        "", // no text — attachment only
+		Attachments: []entity.Attachment{{Data: "base64data", Filename: "img.png", MimeType: "image/png"}},
+		UserID:      testUserIDStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRespondToTask_EmptyTextAndNoAttachments(t *testing.T) {
+	e := newTestController(t)
+
+	task := model.Task{ID: 10, WorkspaceID: 1, Status: "ongoing"}
+	updated := model.Task{ID: 10, WorkspaceID: 1, Status: "ongoing"}
+
+	e.repo.EXPECT().GetWorkspace(gomock.Any(), int64(1), testUserID).Return(activeWorkspace(), nil)
+	e.repo.EXPECT().GetTask(gomock.Any(), int64(1), int64(10), testUserID).Return(task, nil)
+	// No CreateMessage expected — empty text + no attachments should not create a message
+	e.repo.EXPECT().UpdateTask(gomock.Any(), gomock.Any()).Return(updated, nil)
+	e.repo.EXPECT().GetTask(gomock.Any(), int64(1), int64(10), testUserID).Return(updated, nil)
+
+	_, err := e.controller.RespondToTask(context.Background(), entity.RespondToTaskRequest{
+		WorkspaceID: 1,
+		TaskID:      10,
+		Action:      "text",
+		Text:        "",
+		Attachments: nil,
+		UserID:      testUserIDStr,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

@@ -285,3 +285,82 @@ func TestRepository_GetWorkspaceTaskCountsByCategory(t *testing.T) {
 		t.Errorf("expected 1 pending tasks, got %d", counts["pending"])
 	}
 }
+
+// ── FindAttachmentMetadata ────────────────────────────────────────────────────
+
+func newFindAttachmentDB(t *testing.T) (*gorm.DB, Repository) {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	_ = db.AutoMigrate(&model.Task{}, &model.Message{})
+	return db, New(&mockDB{db: db})
+}
+
+func TestFindAttachmentMetadata_InTaskAttachments(t *testing.T) {
+	db, repo := newFindAttachmentDB(t)
+
+	db.Create(&model.Task{
+		ID:          1,
+		WorkspaceID: 100,
+		UserID:      1,
+		Attachments: []byte(`[{"id":"att-task","filename":"report.pdf","mimeType":"application/pdf","data":""}]`),
+	})
+
+	filename, mimeType, err := repo.FindAttachmentMetadata(context.Background(), 100, 1, "att-task")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if filename != "report.pdf" || mimeType != "application/pdf" {
+		t.Errorf("unexpected metadata: %s %s", filename, mimeType)
+	}
+}
+
+func TestFindAttachmentMetadata_InMessageAttachments(t *testing.T) {
+	db, repo := newFindAttachmentDB(t)
+
+	db.Create(&model.Task{ID: 2, WorkspaceID: 100, UserID: 1})
+	db.Create(&model.Message{
+		ID:          201,
+		TaskID:      2,
+		Attachments: []byte(`[{"id":"att-msg","filename":"photo.png","mimeType":"image/png","data":""}]`),
+	})
+
+	filename, mimeType, err := repo.FindAttachmentMetadata(context.Background(), 100, 2, "att-msg")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if filename != "photo.png" || mimeType != "image/png" {
+		t.Errorf("unexpected metadata: %s %s", filename, mimeType)
+	}
+}
+
+func TestFindAttachmentMetadata_NotFound(t *testing.T) {
+	db, repo := newFindAttachmentDB(t)
+
+	db.Create(&model.Task{ID: 3, WorkspaceID: 100, UserID: 1, Attachments: []byte(`[{"id":"other"}]`)})
+
+	_, _, err := repo.FindAttachmentMetadata(context.Background(), 100, 3, "att-missing")
+	if err == nil {
+		t.Fatal("expected error for missing attachment")
+	}
+}
+
+func TestFindAttachmentMetadata_WrongTask(t *testing.T) {
+	db, repo := newFindAttachmentDB(t)
+
+	// Attachment belongs to task 4, but we query for task 5
+	db.Create(&model.Task{ID: 4, WorkspaceID: 100, UserID: 1})
+	db.Create(&model.Task{ID: 5, WorkspaceID: 100, UserID: 1})
+	db.Create(&model.Message{
+		ID:          401,
+		TaskID:      4,
+		Attachments: []byte(`[{"id":"att-task4","filename":"file.txt","mimeType":"text/plain","data":""}]`),
+	})
+
+	_, _, err := repo.FindAttachmentMetadata(context.Background(), 100, 5, "att-task4")
+	if err == nil {
+		t.Fatal("expected error when querying with wrong task ID")
+	}
+}
