@@ -378,10 +378,8 @@ func New(cfg Config) (*App, error) {
 				taskID := id.Int64()
 
 				for i := range attachments {
-					if attachments[i].ID == "" {
-						attachments[i].ID = monoflake.ID(ids.NextID()).String()
-					}
 					if attachments[i].Data != "" {
+						attachments[i].ID = monoflake.ID(ids.NextID()).String()
 						_ = storageSvc.Save(attachments[i].ID, attachments[i].Data)
 						attachments[i].Data = ""
 					}
