@@ -2,7 +2,7 @@
 
 ## 1. AgentRQ CLI
 
-A command-line interface that connects to the AgentRQ backend and spawns agents for desired workspaces. Enables developers to manage workspaces, trigger tasks, and attach agents directly from the terminal without the web UI.
+A command-line interface that connects to the AgentRQ backend and spawns agents for desired workspaces. Enables users to manage workspaces, trigger tasks, and attach agents directly from the terminal without the web UI.
 
 ## 2. Agent-to-Agent Collaborative Workflows
 
