@@ -135,6 +135,16 @@ type GetTaskMessagesParams struct {
 	Limit  int    `json:"limit,omitempty" jsonschema:"The maximum items to return. Default is 5."`
 }
 
+// devMode gates development-only relaxations of the MCP HTTP server (currently
+// the cross-origin protection bypass). It defaults to false (secure) and must be
+// enabled explicitly via SetDevMode at startup for non-production environments.
+var devMode bool
+
+// SetDevMode configures whether the MCP server applies development-only
+// relaxations. Production deployments must leave this false so cross-origin
+// protection stays enforced. See SECURITY-REVIEW.md #5.
+func SetDevMode(v bool) { devMode = v }
+
 func NewWorkspaceServer(
 	workspaceID int64,
 	userID string,
@@ -276,8 +286,11 @@ func NewWorkspaceServer(
 	mcpSrv.AddReceivingMiddleware(ps.notificationMiddleware)
 
 	cp := http.NewCrossOriginProtection()
-	// Allow all origins for the MCP server in development (same syntax as ServeMux)
-	cp.AddInsecureBypassPattern("/")
+	if devMode {
+		// Development only: allow all origins so a local web UI on a different
+		// port can reach the MCP server. Never bypassed in production.
+		cp.AddInsecureBypassPattern("/")
+	}
 
 	streamHandler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return mcpSrv

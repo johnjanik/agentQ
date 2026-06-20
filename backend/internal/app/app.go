@@ -110,6 +110,10 @@ func New(cfg Config) (*App, error) {
 		cfg.App.BaseURL = fmt.Sprintf("http://localhost:%d", cfg.App.Port)
 	}
 
+	// Development-only relaxations (e.g. MCP cross-origin bypass) are enabled only
+	// outside production. Defaults to secure if the environment is unknown.
+	mcp.SetDevMode(cfg.ConfigSvc != nil && cfg.ConfigSvc.Env() != "production")
+
 	appCtx, appCancel := context.WithCancel(context.Background())
 	// cancelOnErr holds the cancel func until the App takes ownership at successful return.
 	// Any early-error return will trigger this defer, preventing a context leak.
