@@ -10,6 +10,25 @@ import (
 
 const ClaimsContextKey = "mcp_claims"
 
+// InsecureDefaultSecrets are placeholder secret values that shipped as config
+// defaults historically. The app must refuse to boot when any auth secret is
+// set to one of these — see SECURITY-REVIEW.md finding #1.
+var InsecureDefaultSecrets = []string{
+	"agentrq-secret-change-me",         // former AGENTRQ_AUTH_JWT_SECRET default
+	"agentrq-token-key-change-me-32by", // former AGENTRQ_AUTH_WORKSPACE_TOKEN_KEY default
+}
+
+// IsInsecureDefaultSecret reports whether s matches a known shipped default
+// secret. Empty values are handled separately by callers.
+func IsInsecureDefaultSecret(s string) bool {
+	for _, d := range InsecureDefaultSecrets {
+		if s == d {
+			return true
+		}
+	}
+	return false
+}
+
 type TokenConfig struct {
 	JWTSecret string `yaml:"jwt_secret"`
 }
@@ -37,6 +56,11 @@ func NewTokenService(cfg TokenConfig) TokenService {
 		// Critical: fallback to an empty secret is not allowed.
 		// In production, the app should fail to start if JWTSecret is missing.
 		panic("situational security: JWT secret is required but not provided in configuration")
+	}
+	if IsInsecureDefaultSecret(cfg.JWTSecret) {
+		// A known placeholder default is as dangerous as an empty secret: it is
+		// public knowledge, so any token could be forged. Refuse to boot.
+		panic("situational security: JWT secret is set to a known insecure default; set AGENTRQ_AUTH_JWT_SECRET to a unique value (see scripts/setup.sh)")
 	}
 	return &tokenService{
 		secret: []byte(cfg.JWTSecret),
