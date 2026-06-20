@@ -32,15 +32,49 @@ type handler struct {
 	domain        string
 }
 
-func corsWrapper(h http.Handler) http.Handler {
+// isLocalhostOrigin reports whether the origin is a localhost/loopback dev origin.
+func isLocalhostOrigin(origin string) bool {
+	return strings.HasPrefix(origin, "http://localhost") ||
+		strings.HasPrefix(origin, "http://127.0.0.1") ||
+		strings.HasPrefix(origin, "https://localhost") ||
+		strings.HasPrefix(origin, "https://127.0.0.1")
+}
+
+// isAllowedOrigin reports whether the request Origin should be granted CORS
+// access. It allows localhost dev origins plus, when a production domain is
+// configured, that domain and its subdomains (e.g. mcp.<domain>, *.mcp.<domain>).
+// Any other origin is denied — we never reflect a wildcard, which would expose
+// this credentialed, token-bearing endpoint to arbitrary websites.
+func isAllowedOrigin(origin, domain string) bool {
+	if origin == "" {
+		return false
+	}
+	if isLocalhostOrigin(origin) {
+		return true
+	}
+	if domain == "" || domain == "localhost" || domain == "127.0.0.1" {
+		return false
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	domain = strings.ToLower(domain)
+	return host == domain || strings.HasSuffix(host, "."+domain)
+}
+
+func corsWrapper(domain string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin != "" && (strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "http://127.0.0.1") || strings.HasPrefix(origin, "https://localhost") || strings.HasPrefix(origin, "https://127.0.0.1")) {
+		if isAllowedOrigin(origin, domain) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-		} else {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
+			// Responses vary by Origin, so caches must key on it.
+			w.Header().Add("Vary", "Origin")
 		}
+		// No wildcard fallback: cross-origin browsers without an allowed Origin
+		// receive no Access-Control-Allow-Origin header and are blocked.
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Mcp-Session-Id, Mcp-Protocol-Version, Authorization")
@@ -69,28 +103,28 @@ func New(p Params) (Handler, error) {
 		hostPattern = "mcp." + p.Domain
 	}
 
-	p.Mux.Handle("/mcp", corsWrapper(h.streamableHandler()))
+	p.Mux.Handle("/mcp", corsWrapper(p.Domain, h.streamableHandler()))
 	if hostPattern != "" {
-		p.Mux.Handle(hostPattern+"/", corsWrapper(h.streamableHandler()))
+		p.Mux.Handle(hostPattern+"/", corsWrapper(p.Domain, h.streamableHandler()))
 	}
 
 	// Localhost distinct paths
-	p.Mux.Handle("/.well-known/oauth-authorization-server", corsWrapper(h.oauthMetadataHandler()))
-	p.Mux.Handle("/mcp/.well-known/oauth-authorization-server", corsWrapper(h.oauthMetadataHandler()))
-	p.Mux.Handle("/.well-known/oauth-protected-resource", corsWrapper(h.oauthProtectedResourceHandler()))
-	p.Mux.Handle("/.well-known/oauth-protected-resource/mcp", corsWrapper(h.oauthProtectedResourceHandler()))
+	p.Mux.Handle("/.well-known/oauth-authorization-server", corsWrapper(p.Domain, h.oauthMetadataHandler()))
+	p.Mux.Handle("/mcp/.well-known/oauth-authorization-server", corsWrapper(p.Domain, h.oauthMetadataHandler()))
+	p.Mux.Handle("/.well-known/oauth-protected-resource", corsWrapper(p.Domain, h.oauthProtectedResourceHandler()))
+	p.Mux.Handle("/.well-known/oauth-protected-resource/mcp", corsWrapper(p.Domain, h.oauthProtectedResourceHandler()))
 	p.Mux.Handle("/mcp/oauth2/authorize", h.oauthAuthorizeHandler())
-	p.Mux.Handle("/mcp/oauth2/token", corsWrapper(h.oauthTokenHandler()))
-	p.Mux.Handle("/mcp/oauth2/register", corsWrapper(h.oauthRegisterHandler()))
+	p.Mux.Handle("/mcp/oauth2/token", corsWrapper(p.Domain, h.oauthTokenHandler()))
+	p.Mux.Handle("/mcp/oauth2/register", corsWrapper(p.Domain, h.oauthRegisterHandler()))
 
 	// Host-based distinct paths
 	if hostPattern != "" {
-		p.Mux.Handle(hostPattern+"/.well-known/oauth-authorization-server", corsWrapper(h.oauthMetadataHandler()))
-		p.Mux.Handle(hostPattern+"/.well-known/oauth-protected-resource", corsWrapper(h.oauthProtectedResourceHandler()))
-		p.Mux.Handle(hostPattern+"/.well-known/oauth-protected-resource/mcp", corsWrapper(h.oauthProtectedResourceHandler()))
+		p.Mux.Handle(hostPattern+"/.well-known/oauth-authorization-server", corsWrapper(p.Domain, h.oauthMetadataHandler()))
+		p.Mux.Handle(hostPattern+"/.well-known/oauth-protected-resource", corsWrapper(p.Domain, h.oauthProtectedResourceHandler()))
+		p.Mux.Handle(hostPattern+"/.well-known/oauth-protected-resource/mcp", corsWrapper(p.Domain, h.oauthProtectedResourceHandler()))
 		p.Mux.Handle(hostPattern+"/oauth2/authorize", h.oauthAuthorizeHandler())
-		p.Mux.Handle(hostPattern+"/oauth2/token", corsWrapper(h.oauthTokenHandler()))
-		p.Mux.Handle(hostPattern+"/oauth2/register", corsWrapper(h.oauthRegisterHandler()))
+		p.Mux.Handle(hostPattern+"/oauth2/token", corsWrapper(p.Domain, h.oauthTokenHandler()))
+		p.Mux.Handle(hostPattern+"/oauth2/register", corsWrapper(p.Domain, h.oauthRegisterHandler()))
 	}
 
 	return h, nil

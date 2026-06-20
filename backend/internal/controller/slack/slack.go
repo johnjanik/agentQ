@@ -811,8 +811,36 @@ func stripBotMention(text, botUserID string) string {
 	return strings.TrimSpace(strings.ReplaceAll(text, mention, ""))
 }
 
-func downloadSlackFile(ctx context.Context, token string, url string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+// maxSlackFileBytes caps how much of a Slack file we read into memory, to bound
+// the blast radius of a malicious or accidental oversized download.
+const maxSlackFileBytes = 50 << 20 // 50 MiB
+
+// isSlackHost reports whether host is slack.com or a subdomain of it. Slack
+// file URLs are served from files.slack.com.
+func isSlackHost(host string) bool {
+	host = strings.ToLower(host)
+	return host == "slack.com" || strings.HasSuffix(host, ".slack.com")
+}
+
+// allowSlackDownloadURL is the policy deciding whether the bot token may be sent
+// to a given file URL. Default: HTTPS to a Slack-owned host only. It is a
+// variable so tests can target a local server; production keeps the pinning.
+var allowSlackDownloadURL = func(u *url.URL) bool {
+	return u.Scheme == "https" && isSlackHost(u.Hostname())
+}
+
+func downloadSlackFile(ctx context.Context, token string, fileURL string) (string, error) {
+	// Host-pin before attaching the bot token: only ever send credentials to
+	// Slack-owned hosts so a tampered file URL can't exfiltrate the token (SSRF).
+	parsed, err := url.Parse(fileURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid slack file url: %w", err)
+	}
+	if !allowSlackDownloadURL(parsed) {
+		return "", fmt.Errorf("refusing to download slack file from disallowed url host %q", parsed.Host)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", fileURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -828,9 +856,13 @@ func downloadSlackFile(ctx context.Context, token string, url string) (string, e
 		return "", fmt.Errorf("bad status code: %d", resp.StatusCode)
 	}
 
-	b, err := io.ReadAll(resp.Body)
+	// Cap the read so an oversized response can't exhaust memory.
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxSlackFileBytes+1))
 	if err != nil {
 		return "", err
+	}
+	if len(b) > maxSlackFileBytes {
+		return "", fmt.Errorf("slack file exceeds %d bytes", maxSlackFileBytes)
 	}
 
 	return base64.StdEncoding.EncodeToString(b), nil

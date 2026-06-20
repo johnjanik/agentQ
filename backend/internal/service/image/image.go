@@ -13,6 +13,14 @@ import (
 	"golang.org/x/image/draw"
 )
 
+// Limits guarding against decompression/image bombs: a few KB of input can
+// otherwise declare enormous dimensions and force a huge pixel allocation.
+const (
+	maxImageBytes  = 10 << 20 // 10 MiB of decoded input
+	maxImageDim    = 8192     // max width or height in pixels
+	maxImagePixels = 1 << 26  // total pixel budget (8192*8192)
+)
+
 type Service interface {
 	ResizeBase64(dataBase64 string, width, height int) (string, error)
 }
@@ -39,6 +47,22 @@ func (s *service) ResizeBase64(dataBase64 string, width, height int) (string, er
 	decoded, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil {
 		return "", fmt.Errorf("decode base64: %w", err)
+	}
+
+	if len(decoded) > maxImageBytes {
+		return "", fmt.Errorf("image too large: %d bytes (max %d)", len(decoded), maxImageBytes)
+	}
+
+	// Inspect dimensions cheaply (no full pixel allocation) before decoding, to
+	// reject image bombs that declare enormous sizes.
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(decoded))
+	if err != nil {
+		return "", fmt.Errorf("decode image config: %w", err)
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 ||
+		cfg.Width > maxImageDim || cfg.Height > maxImageDim ||
+		int64(cfg.Width)*int64(cfg.Height) > maxImagePixels {
+		return "", fmt.Errorf("image dimensions too large: %dx%d", cfg.Width, cfg.Height)
 	}
 
 	img, fmtName, err := image.Decode(bytes.NewReader(decoded))

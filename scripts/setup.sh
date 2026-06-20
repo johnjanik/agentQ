@@ -172,7 +172,7 @@ echo ""
 # Create storage directory
 echo -e "${GREEN}✓ Creating storage directory...${NC}"
 mkdir -p storage
-chmod 0777 storage
+chmod 0755 storage
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
