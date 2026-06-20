@@ -1,9 +1,13 @@
-version: '3.8'
-
 services:
   # AgentRQ main application
   agentrq:
-    image: agentrq/agentrq:latest
+    # Build the image from this repo's source so the running binary matches the
+    # audited code, instead of pulling the upstream prebuilt image.
+    # See SECURITY-REVIEW.md #6. Build with: docker compose build
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: agentrq-local:latest
     container_name: agentrq
     restart: unless-stopped
     ports:
