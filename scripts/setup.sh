@@ -169,10 +169,10 @@ EOF
 echo -e "${GREEN}✓ .env file created${NC}"
 echo ""
 
-# Create storage directory
-echo -e "${GREEN}✓ Creating storage directory...${NC}"
-mkdir -p storage
-chmod 0755 storage
+# Create storage directories (DB at ./storage, attachments at ./_storage)
+echo -e "${GREEN}✓ Creating storage directories...${NC}"
+mkdir -p storage _storage
+chmod 0755 storage _storage
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"

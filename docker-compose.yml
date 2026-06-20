@@ -73,6 +73,10 @@ services:
 
     volumes:
       - ./storage:/storage
+      # Attachment store. The app writes to ./_storage (relative to the
+      # container workdir /), which the non-root user cannot create unless it is
+      # a mounted, writable volume.
+      - ./_storage:/_storage
       - ./certs:/_certs
     depends_on:
       postgres:
