@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -408,6 +409,35 @@ func TestProcessEvent_OriginSlack(t *testing.T) {
 	c.(*controller).processEvent(context.Background(), event)
 }
 
+// SECURITY-REVIEW.md #5: the bot token must only ever be sent to Slack-owned
+// HTTPS hosts; the default download policy must reject everything else.
+func TestAllowSlackDownloadURL_DefaultPolicy(t *testing.T) {
+	allowed := []string{
+		"https://files.slack.com/files-pri/T1-F1/secret.png",
+		"https://slack.com/foo",
+		"https://edgeapi.slack.com/x",
+	}
+	denied := []string{
+		"http://files.slack.com/x",           // not https
+		"https://evil.com/x",                 // wrong host
+		"https://files.slack.com.evil.com/x", // suffix trick
+		"https://notslack.com/x",
+		"https://127.0.0.1/x",
+	}
+	for _, s := range allowed {
+		u, _ := url.Parse(s)
+		if !allowSlackDownloadURL(u) {
+			t.Errorf("expected %q to be allowed", s)
+		}
+	}
+	for _, s := range denied {
+		u, _ := url.Parse(s)
+		if allowSlackDownloadURL(u) {
+			t.Errorf("expected %q to be denied", s)
+		}
+	}
+}
+
 func TestHandleSlackEvent_WithFiles(t *testing.T) {
 	gomockCtrl := gomock.NewController(t)
 	defer gomockCtrl.Finish()
@@ -415,6 +445,12 @@ func TestHandleSlackEvent_WithFiles(t *testing.T) {
 	mockRepo := mock_repo.NewMockRepository(gomockCtrl)
 	mockPubSub := mock_pubsub.NewMockService(gomockCtrl)
 	mcp := &mockMCP{}
+
+	// The download URL is pinned to Slack-owned HTTPS hosts in production; relax
+	// the policy here so the local httptest server is reachable, and restore it.
+	origPolicy := allowSlackDownloadURL
+	allowSlackDownloadURL = func(*url.URL) bool { return true }
+	defer func() { allowSlackDownloadURL = origPolicy }()
 
 	// Setup a mock HTTP test server to serve the private file download
 	fileContent := "hello from slack attachment"
