@@ -204,6 +204,24 @@ func TestCreateTask_ValidCronSchedule(t *testing.T) {
 	}
 }
 
+// SECURITY-REVIEW.md #3: a sub-hourly recurring schedule is syntactically valid
+// cron but exceeds the supported granularity. It must be rejected on the REST
+// CreateTask path, not just via the MCP handler — and before any repo write.
+func TestCreateTask_SubHourlyCronRejected(t *testing.T) {
+	e := newTestController(t)
+
+	e.repo.EXPECT().GetWorkspace(gomock.Any(), int64(1), testUserID).Return(activeWorkspace(), nil)
+	// No idgen/CreateTask expectations: validation must fail before persistence.
+
+	_, err := e.controller.CreateTask(context.Background(), entity.CreateTaskRequest{
+		UserID: testUserIDStr,
+		Task:   entity.Task{WorkspaceID: 1, Title: "t", Status: "cron", CronSchedule: "*/5 * * * *"},
+	})
+	if err == nil {
+		t.Fatal("expected error for sub-hourly cron schedule")
+	}
+}
+
 func TestCreateTask_RepositoryError(t *testing.T) {
 	e := newTestController(t)
 
@@ -612,6 +630,24 @@ func TestUpdateScheduledTask_InvalidCron(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid cron schedule")
+	}
+}
+
+// SECURITY-REVIEW.md #3: sub-hourly granularity must also be rejected on the
+// UpdateScheduledTask path, before any repo write.
+func TestUpdateScheduledTask_SubHourlyCronRejected(t *testing.T) {
+	e := newTestController(t)
+
+	task := model.Task{ID: 10, WorkspaceID: 1, Status: "cron"}
+	e.repo.EXPECT().GetWorkspace(gomock.Any(), int64(1), testUserID).Return(activeWorkspace(), nil)
+	e.repo.EXPECT().GetTask(gomock.Any(), int64(1), int64(10), testUserID).Return(task, nil)
+	// No UpdateTask expectation: validation must fail before persistence.
+
+	_, err := e.controller.UpdateScheduledTask(context.Background(), entity.UpdateScheduledTaskRequest{
+		WorkspaceID: 1, TaskID: 10, CronSchedule: "*/5 * * * *", UserID: testUserIDStr,
+	})
+	if err == nil {
+		t.Fatal("expected error for sub-hourly cron schedule")
 	}
 }
 

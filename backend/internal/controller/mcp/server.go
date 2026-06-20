@@ -8,16 +8,15 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
 
-	"github.com/robfig/cron/v3"
 	zlog "github.com/rs/zerolog/log"
 
+	"github.com/agentrq/agentrq/backend/internal/controller/crud"
 	entity "github.com/agentrq/agentrq/backend/internal/data/entity/crud"
 	"github.com/agentrq/agentrq/backend/internal/data/model"
 	mapper "github.com/agentrq/agentrq/backend/internal/mapper/api"
@@ -37,6 +36,7 @@ import (
 type CreateTaskFunc func(ctx context.Context, task model.Task) (model.Task, error)
 type UpdateTaskStatusFunc func(ctx context.Context, taskID int64, status string) (model.Task, error)
 type GetTaskFunc func(ctx context.Context, taskID int64) (model.Task, error)
+
 // ListTasksFilter specifies optional filters for listing tasks.
 type ListTasksFilter struct {
 	Status []string
@@ -1398,38 +1398,9 @@ func formatModelAttachments(raw []byte) string {
 	return "Attachments:\n" + strings.Join(parts, "\n")
 }
 
-// validateCronGranularity validates that the cron schedule is syntactically valid.
-// For RECURRING schedules (dom or month field is "*"), the minimum granularity is
-// hourly: the minute field must be a single fixed integer 0-59 (no wildcards, steps,
-// ranges, or comma-lists), because sub-hourly recurring tasks are not supported.
-// For ONE-TIME schedules (both dom and month are fixed integers, e.g. "30 14 25 4 *"),
-// any fixed minute value 0-59 is accepted — enabling minute-level precision.
+// validateCronGranularity delegates to crud.ValidateCronGranularity, the single
+// source of truth for cron schedule syntax and granularity rules shared by every
+// transport (MCP tool handlers and the REST CRUD paths). See SECURITY-REVIEW.md #3.
 func validateCronGranularity(schedule string) error {
-	fields := strings.Fields(schedule)
-	if len(fields) != 5 {
-		return fmt.Errorf("cron schedule must have exactly 5 fields (minute hour dom month dow)")
-	}
-
-	minuteField := fields[0]
-
-	// Reject wildcards, steps (*/n), ranges (a-b), and comma-lists in the minute field.
-	if minuteField == "*" ||
-		strings.Contains(minuteField, "/") ||
-		strings.Contains(minuteField, "-") ||
-		strings.Contains(minuteField, ",") {
-		return fmt.Errorf("cron schedule granularity too fine: minute field must be a single fixed value (0-59), not %q — only hourly or coarser schedules are allowed", minuteField)
-	}
-
-	minute, err := strconv.Atoi(minuteField)
-	if err != nil || minute < 0 || minute > 59 {
-		return fmt.Errorf("cron schedule minute field must be a valid integer between 0 and 59, got %q", minuteField)
-	}
-
-	// Validate overall syntax using the standard 5-field parser.
-	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-	if _, err := parser.Parse(schedule); err != nil {
-		return fmt.Errorf("invalid cron schedule: %w", err)
-	}
-
-	return nil
+	return crud.ValidateCronGranularity(schedule)
 }

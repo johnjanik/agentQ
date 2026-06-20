@@ -10,7 +10,6 @@ import (
 	"github.com/agentrq/agentrq/backend/internal/data/model"
 	"github.com/agentrq/agentrq/backend/internal/repository/base"
 	"github.com/mustafaturan/monoflake"
-	"github.com/robfig/cron/v3"
 	"gorm.io/datatypes"
 )
 
@@ -53,10 +52,9 @@ func (c *controller) CreateTask(ctx context.Context, req entity.CreateTaskReques
 		if req.Task.CronSchedule == "" {
 			return nil, fmt.Errorf("cron_schedule is required for chronic tasks")
 		}
-		// Validate Cron Schedule
-		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-		if _, err := parser.Parse(req.Task.CronSchedule); err != nil {
-			return nil, fmt.Errorf("invalid cron schedule: %w", err)
+		// Validate syntax AND granularity (hourly minimum for recurring schedules).
+		if err := ValidateCronGranularity(req.Task.CronSchedule); err != nil {
+			return nil, err
 		}
 	}
 
@@ -91,20 +89,20 @@ func (c *controller) CreateTask(ctx context.Context, req entity.CreateTaskReques
 	}
 
 	m := model.Task{
-		ID:           c.idgen.NextID(),
-		CreatedAt:    now,
-		UpdatedAt:    now,
-		UserID:       userID,
-		WorkspaceID:  req.Task.WorkspaceID,
-		CreatedBy:    req.Task.CreatedBy,
-		Assignee:     req.Task.Assignee,
-		Status:       status,
-		Title:        req.Task.Title,
-		Body:         req.Task.Body,
-		Attachments:  attachJSON,
-		CronSchedule: req.Task.CronSchedule,
-		ParentID:     req.Task.ParentID,
-		SortOrder:    sortOrder,
+		ID:               c.idgen.NextID(),
+		CreatedAt:        now,
+		UpdatedAt:        now,
+		UserID:           userID,
+		WorkspaceID:      req.Task.WorkspaceID,
+		CreatedBy:        req.Task.CreatedBy,
+		Assignee:         req.Task.Assignee,
+		Status:           status,
+		Title:            req.Task.Title,
+		Body:             req.Task.Body,
+		Attachments:      attachJSON,
+		CronSchedule:     req.Task.CronSchedule,
+		ParentID:         req.Task.ParentID,
+		SortOrder:        sortOrder,
 		AllowAllCommands: allowAll,
 	}
 	created, err := c.repository.CreateTask(ctx, m)
@@ -623,23 +621,23 @@ func (c *controller) fromModelTaskToEntity(m model.Task) entity.Task {
 	}
 
 	return entity.Task{
-		ID:           m.ID,
-		CreatedAt:    m.CreatedAt,
-		UpdatedAt:    m.UpdatedAt,
-		WorkspaceID:  m.WorkspaceID,
-		UserID:       m.UserID,
-		CreatedBy:    m.CreatedBy,
-		Assignee:     m.Assignee,
-		Status:       m.Status,
-		Title:        m.Title,
-		Body:         m.Body,
-		Response:     m.Response,
-		ReplyText:    m.ReplyText,
-		Attachments:  atts,
-		Messages:     msgs,
-		CronSchedule: m.CronSchedule,
-		ParentID:     m.ParentID,
-		SortOrder:    m.SortOrder,
+		ID:               m.ID,
+		CreatedAt:        m.CreatedAt,
+		UpdatedAt:        m.UpdatedAt,
+		WorkspaceID:      m.WorkspaceID,
+		UserID:           m.UserID,
+		CreatedBy:        m.CreatedBy,
+		Assignee:         m.Assignee,
+		Status:           m.Status,
+		Title:            m.Title,
+		Body:             m.Body,
+		Response:         m.Response,
+		ReplyText:        m.ReplyText,
+		Attachments:      atts,
+		Messages:         msgs,
+		CronSchedule:     m.CronSchedule,
+		ParentID:         m.ParentID,
+		SortOrder:        m.SortOrder,
 		AllowAllCommands: m.AllowAllCommands,
 	}
 }
@@ -719,10 +717,9 @@ func (c *controller) UpdateScheduledTask(ctx context.Context, req entity.UpdateS
 		m.Status = "notstarted"
 		m.CronSchedule = ""
 	} else {
-		// Validate Cron Schedule
-		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-		if _, err := parser.Parse(req.CronSchedule); err != nil {
-			return nil, fmt.Errorf("invalid cron schedule: %w", err)
+		// Validate syntax AND granularity (hourly minimum for recurring schedules).
+		if err := ValidateCronGranularity(req.CronSchedule); err != nil {
+			return nil, err
 		}
 		m.CronSchedule = req.CronSchedule
 	}
