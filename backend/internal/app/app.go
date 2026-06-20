@@ -110,6 +110,11 @@ func New(cfg Config) (*App, error) {
 		cfg.App.BaseURL = fmt.Sprintf("http://localhost:%d", cfg.App.Port)
 	}
 
+	// Fail closed before any side effects if auth secrets are missing or default.
+	if err := validateAuthSecrets(cfg); err != nil {
+		return nil, fmt.Errorf("insecure auth configuration: %w", err)
+	}
+
 	// Development-only relaxations (e.g. MCP cross-origin bypass) are enabled only
 	// outside production. Defaults to secure if the environment is unknown.
 	mcp.SetDevMode(cfg.ConfigSvc != nil && cfg.ConfigSvc.Env() != "production")

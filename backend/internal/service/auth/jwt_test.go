@@ -125,4 +125,32 @@ func TestTokenService(t *testing.T) {
 
 		NewTokenService(TokenConfig{})
 	})
+
+	t.Run("PanicsWhenSecretIsKnownDefault", func(t *testing.T) {
+		for _, def := range InsecureDefaultSecrets {
+			func() {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("expected panic for known default secret %q, got none", def)
+					}
+				}()
+				NewTokenService(TokenConfig{JWTSecret: def})
+			}()
+		}
+	})
+}
+
+func TestIsInsecureDefaultSecret(t *testing.T) {
+	for _, def := range InsecureDefaultSecrets {
+		if !IsInsecureDefaultSecret(def) {
+			t.Errorf("expected %q to be reported as insecure default", def)
+		}
+	}
+	if IsInsecureDefaultSecret("a-unique-generated-secret") {
+		t.Error("unique secret wrongly reported as insecure default")
+	}
+	// Empty is handled separately by callers, not by this helper.
+	if IsInsecureDefaultSecret("") {
+		t.Error("empty string should not be classified as a known default here")
+	}
 }
