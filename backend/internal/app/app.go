@@ -110,6 +110,11 @@ func New(cfg Config) (*App, error) {
 		cfg.App.BaseURL = fmt.Sprintf("http://localhost:%d", cfg.App.Port)
 	}
 
+	// Fail closed before any side effects if auth secrets are missing or default.
+	if err := validateAuthSecrets(cfg); err != nil {
+		return nil, fmt.Errorf("insecure auth configuration: %w", err)
+	}
+
 	appCtx, appCancel := context.WithCancel(context.Background())
 	// cancelOnErr holds the cancel func until the App takes ownership at successful return.
 	// Any early-error return will trigger this defer, preventing a context leak.
